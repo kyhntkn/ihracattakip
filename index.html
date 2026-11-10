@@ -49,6 +49,9 @@ dialog::backdrop{background:rgba(0,0,0,.45)}
 .det{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:12px 20px;padding:4px 2px 6px}.det .w{grid-column:1/-1}.det .meta{font-size:12px;font-weight:600;margin-bottom:2px}
 fieldset{border:1px solid var(--line);border-radius:8px;margin:12px 0;padding:8px 12px 12px}
 legend{font-weight:650;padding:0 6px;font-size:14px}
+.fst{background:none;border:0;padding:0;font:inherit;font-weight:650;font-size:14px;color:var(--ink);cursor:pointer}
+fieldset.kapali{padding-bottom:2px}
+fieldset.kapali > .fsb{display:none}
 .g{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px}
 label{display:block;font-size:13px;color:var(--mute)}
 label input,label select,label textarea{display:block;width:100%;margin-top:3px;padding:7px 9px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--ink)}
@@ -130,7 +133,7 @@ label input,label select,label textarea{display:block;width:100%;margin-top:3px;
       <label>Durum<select id="durum"></select></label>
     </div></fieldset>
 
-    <fieldset><legend>Durum geçmişi</legend>
+    <fieldset><legend>Durum Geçmişi</legend>
       <div class="g">
         <label>Durum<input id="dgDurum" list="durumListe" placeholder="Seçin veya yazın"><datalist id="durumListe"></datalist></label>
         <label>Açıklama<input id="dgAcik"></label>
@@ -164,7 +167,7 @@ label input,label select,label textarea{display:block;width:100%;margin-top:3px;
         <label>Ülke<input id="gUlke"></label>
       </div>
     </fieldset>
-    <fieldset><legend>Alıcı Bilgileri / Partner ve teslimat</legend>
+    <fieldset><legend>Alıcı Bilgileri / Partner ve Teslimat</legend>
       <div class="bookline"><label>Kayıtlı alıcılar<select id="aliciSec"><option value="">Adres defterinden seçin…</option></select></label><button type="button" id="aliciYukle">Bilgileri getir</button><button type="button" id="aliciKaydet">Alıcıyı adres defterine kaydet</button><button type="button" class="d" id="aliciTemizle">Temizle</button></div>
       <div class="g">
         <label>Partner / kurum<input id="partner"></label>
@@ -181,7 +184,7 @@ label input,label select,label textarea{display:block;width:100%;margin-top:3px;
       </div>
     </fieldset>
 
-    <fieldset><legend>İhracat başvurusu</legend><div class="g">
+    <fieldset><legend>İhracat Başvurusu</legend><div class="g">
       <label>Başvuru no<input id="basNo"></label>
       <label>Başvuru tarihi<input type="date" id="basT"></label>
       <label>İhracat onay tarihi<input type="date" id="ihrT"></label>
@@ -198,7 +201,7 @@ label input,label select,label textarea{display:block;width:100%;margin-top:3px;
     <button id="masrafEkle" style="margin-top:8px">+ Masraf ekle</button>
     <div class="sum" id="masrafToplam"></div></fieldset>
 
-    <fieldset><legend>Packing List Bilgileri</legend>
+    <fieldset><legend>Packing List</legend>
       <div class="plgrid">
         <label>Belge tarihi<input type="date" id="plDate"></label>
         <label>Terms of delivery<input id="deliveryTerms" placeholder="Örn. Uppsala, Sweden"></label>
@@ -219,7 +222,7 @@ label input,label select,label textarea{display:block;width:100%;margin-top:3px;
       <div class="plactions" style="margin-top:0"><button type="button" class="p" id="excelOlustur">Excel oluştur (.xlsx)</button></div>
       <div class="meta" style="margin-top:6px">Şablondaki işaretli alanlar bu talepten doldurulur (turuncu renk çıktıda kaldırılır): kargo firması, alıcı adı ve adresi, ürün satırları (kod, ad, miktar, seri no, birim fiyat, para birimi, sıcaklık, 3006 depo, CoA), net/brüt ağırlık ve kutu ölçüsü.</div>
     </fieldset>
-    <label>Notlar<textarea id="not" rows="2"></textarea></label>
+    <fieldset id="fsNotlar"><legend>Notlar</legend><label>Notlar<textarea id="not" rows="3"></textarea></label></fieldset>
   </div>
 </dialog>
 
@@ -463,7 +466,7 @@ function ac(id){
   $("urunler").innerHTML="";(t.urunler.length?t.urunler:[{}]).map(u=>(u.sicak===undefined&&t.sicak==="1")?{...u,sicak:"1",sicakD:t.sicakD}:u).forEach(urunSatir);
   $("dbaslik").textContent=aktif?"Talep: "+(t.ref||""):"Yeni talep";
   $("sil").classList.toggle("hide",!aktif);
-  hesapla();$("dlg").showModal();
+  hesapla();bolumleriSifirla();$("dlg").showModal();
 }
 
 function formOku(t){
@@ -826,6 +829,30 @@ $("fltTemizle").onclick=fltTemizle;
 [["fUlke","ulke"],["fPartner","partner"],["fUrun","urun"],["fSicak","sicak"]].forEach(([id,k])=>$(id).onchange=e=>{flt[k]=e.target.value;ciz()});
 
 yukle();secenekleriDoldur();ciz();
+
+/* ---- Talep ekranı: bölüm sırası ve + / − aç-kapa ---- */
+(function(){
+  const body=document.querySelector("#dlg .db");
+  const fs=[...body.querySelectorAll(":scope > fieldset, :scope > #docAlanlari > fieldset")];
+  const bul=ad=>fs.find(f=>f.querySelector(":scope > legend").textContent.trim()===ad);
+  const SIRA=["Talep","Durum Geçmişi","Gönderici Bilgileri","Alıcı Bilgileri / Partner ve Teslimat","Notlar","Ürünler","Sevkiyat","İhracat Başvurusu","Excel Gönderim Şablonu","Packing List","Non-Toxic Letter","Proforma Invoice"];
+  const holder=document.getElementById("docAlanlari");
+  SIRA.forEach(ad=>{const f=bul(ad);if(f)body.insertBefore(f,holder)});
+  holder.remove();
+  SIRA.forEach(ad=>{
+    const f=bul(ad);if(!f)return;
+    const lg=f.querySelector(":scope > legend");
+    const ic=[...f.childNodes].filter(n=>n!==lg);
+    const w=document.createElement("div");w.className="fsb";ic.forEach(n=>w.appendChild(n));f.appendChild(w);
+    const b=document.createElement("button");b.type="button";b.className="fst";
+    lg.textContent="";lg.appendChild(b);
+    const ayarla=ac=>{f.classList.toggle("kapali",!ac);b.textContent=(ac?"− ":"+ ")+ad;b.setAttribute("aria-expanded",ac)};
+    b.onclick=()=>ayarla(f.classList.contains("kapali"));
+    f._ayarla=ayarla;f._ad=ad;ayarla(false);
+  });
+  window.bolumleriSifirla=()=>fs.forEach(f=>{if(f._ayarla)f._ayarla(f._ad==="Talep")});
+  bolumleriSifirla();
+})();
 </script>
 </body>
 </html>
