@@ -34,6 +34,9 @@ main{max-width:1100px;margin:0 auto;padding:16px 20px 60px}
 .lt td{padding:10px 12px;border-bottom:1px solid var(--line);vertical-align:top}
 .lt tbody tr{cursor:default}.lt tbody tr:hover{background:var(--acc2)}.lt tbody tr:last-child td{border-bottom:0}
 .lt .r{text-align:right;white-space:nowrap}
+.gzb{padding:2px 8px;font-size:11px;border-radius:6px;border:1px solid var(--line);background:var(--card);color:var(--mute);cursor:pointer}.gzb:hover{background:var(--acc2);color:var(--acc)}
+.lt tr.gz td{opacity:.55}
+.lt tr.gz td:last-child{opacity:1}
 #liste .lt td{font-size:13px}#liste .lt th{font-size:11px}#liste .lt .st{font-size:11px}#liste .lt .tmp{font-size:10px}#liste .lt .meta{font-size:11px}#liste .lt .det .meta{font-size:10px}
 .dot{display:inline-block;width:12px;height:12px;border-radius:50%;margin-right:8px;vertical-align:-1px}
 .dot.s{width:9px;height:9px;vertical-align:0}
@@ -105,13 +108,14 @@ label input,label select,label textarea{display:block;width:100%;margin-top:3px;
     <button type="button" id="fltAc">Filtre</button>
   </div>
   <div class="meta" id="fltOzet" style="margin:-6px 0 12px"></div>
-  <div class="chips" id="chips"></div>
+  <div class="meta" id="gizliBilgi" style="margin:-6px 0 12px"></div>
   <div id="liste"></div>
 </main>
 
 <dialog id="fltDlg" style="width:min(460px,96vw)">
   <div class="dh"><b>Filtre</b><span class="dhb"><button type="button" class="d" id="fltTemizle">Temizle</button><button type="button" class="p" id="fltKapat">Tamam</button></span></div>
   <div class="db"><div class="g" style="grid-template-columns:1fr">
+    <label>İşlem durumu<select id="fDurum"></select></label>
     <label>Ülke<select id="fUlke"></select></label>
     <label>Partner<select id="fPartner"></select></label>
     <label>Ürün<select id="fUrun"></select></label>
@@ -252,15 +256,16 @@ const refSirala=(a,b)=>String(a.ref||"").localeCompare(String(b.ref||""),"tr",{n
 const renk=d=>RENK[d]||"#7b8aa0";
 const KEY="ihracat_takip_v1", SKEY="ihracat_son_yedek";
 const $=id=>document.getElementById(id);
-let db=[], aktif=null, filtreDurum="";
-const flt={ulke:"",partner:"",urun:"",sicak:""};
+let db=[], aktif=null, gizliGoster=false;
+const flt={durum:"",ulke:"",partner:"",urun:"",sicak:""};
 const fk=s=>String(s||"").trim().toLocaleLowerCase("tr-TR");
 const urunAdi=u=>String(u.ad||u.kod||"").trim();
 function fltSay(){return Object.values(flt).filter(Boolean).length}
-function fltOzet(){const p=[];if(flt.ulke)p.push("Ülke: "+flt.ulke);if(flt.partner)p.push("Partner: "+flt.partner);if(flt.urun)p.push("Ürün: "+flt.urun);if(flt.sicak)p.push(flt.sicak==="1"?"Sıcaklık koşullu":"Normal");return p.join(" · ")}
+function fltOzet(){const p=[];if(flt.durum)p.push("Durum: "+flt.durum);if(flt.ulke)p.push("Ülke: "+flt.ulke);if(flt.partner)p.push("Partner: "+flt.partner);if(flt.urun)p.push("Ürün: "+flt.urun);if(flt.sicak)p.push(flt.sicak==="1"?"Sıcaklık koşullu":"Normal");return p.join(" · ")}
 function filtreliListe(){
   const q=$("ara").value.toLowerCase();
-  return db.filter(t=>(!filtreDurum||t.durum===filtreDurum)
+  return db.filter(t=>(gizliGoster||!t.gizli)
+    &&(!flt.durum||t.durum===flt.durum)
     &&(!flt.ulke||fk(t.ulke)===fk(flt.ulke))
     &&(!flt.partner||fk(t.partner)===fk(flt.partner))
     &&(!flt.urun||t.urunler.some(u=>fk(urunAdi(u))===fk(flt.urun)))
@@ -270,6 +275,8 @@ function filtreliListe(){
 function fltSecenekler(){
   const tekil=f=>{const m=new Map();db.forEach(t=>f(t).forEach(v=>{const s=String(v||"").trim();if(s&&!m.has(fk(s)))m.set(fk(s),s)}));return [...m.values()].sort((a,b)=>a.localeCompare(b,"tr"))};
   const doldur=(id,liste,secili,bos)=>{const el=$(id);if(secili&&!liste.some(x=>fk(x)===fk(secili)))liste=[secili,...liste];el.innerHTML=`<option value="">${bos}</option>`+liste.map(x=>`<option value="${esc(x)}" ${fk(x)===fk(secili)?"selected":""}>${esc(x)}</option>`).join("")};
+  const sayi={};db.forEach(t=>sayi[t.durum]=(sayi[t.durum]||0)+1);
+  $("fDurum").innerHTML=`<option value="">Hepsi (${db.length})</option>`+DURUMLAR.map(d=>`<option value="${esc(d)}" ${flt.durum===d?"selected":""}>${esc(d)} (${sayi[d]||0})</option>`).join("");
   doldur("fUlke",tekil(t=>[t.ulke]),flt.ulke,"Hepsi");
   doldur("fPartner",tekil(t=>[t.partner]),flt.partner,"Hepsi");
   doldur("fUrun",tekil(t=>t.urunler.map(urunAdi)),flt.urun,"Hepsi");
@@ -302,23 +309,23 @@ function uyariGoster(){
 }
 
 function ciz(){
-  const sayi={};db.forEach(t=>sayi[t.durum]=(sayi[t.durum]||0)+1);
-  $("chips").innerHTML=`<button class="chip ${filtreDurum?"":"on"}" data-d="">Hepsi (${db.length})</button>`+DURUMLAR.map(d=>`<button class="chip ${filtreDurum===d?"on":""}" data-d="${esc(d)}"><span class="dot s" style="background:${renk(d)}"></span>${esc(d)} (${sayi[d]||0})</button>`).join("");
-  document.querySelectorAll(".chip").forEach(b=>b.onclick=()=>{filtreDurum=b.dataset.d;ciz()});
   const l=filtreliListe();
   $("fltAc").textContent="Filtre"+(fltSay()?" ("+fltSay()+")":"");
   $("fltAc").classList.toggle("p",fltSay()>0);
   $("fltOzet").innerHTML=fltSay()?esc(fltOzet())+' · <a href="#" id="fltX">Filtreyi temizle</a>':"";
   if($("fltX"))$("fltX").onclick=e=>{e.preventDefault();fltTemizle()};
+  const gs=db.filter(t=>t.gizli).length;
+  $("gizliBilgi").innerHTML=gs?`${gs} satır gizli · <a href="#" id="gizliTg">${gizliGoster?"Gizlenenleri sakla":"Gizlenenleri göster"}</a>`:"";
+  if($("gizliTg"))$("gizliTg").onclick=e=>{e.preventDefault();gizliGoster=!gizliGoster;ciz()};
   const kvd=(b,i)=>`<div><div class="meta">${b}</div>${i||"—"}</div>`;
-  $("liste").innerHTML=l.length?`<div class="tw"><table class="lt"><thead><tr><th style="width:44px"></th><th>Ref no</th><th>Partner</th><th>Ülke</th><th>Talepler</th><th>İşlem durumu</th></tr></thead><tbody>`+l.map(t=>{
+  $("liste").innerHTML=l.length?`<div class="tw"><table class="lt"><thead><tr><th style="width:44px"></th><th>Ref no</th><th>Partner</th><th>Ülke</th><th>Talepler</th><th>İşlem durumu</th><th style="width:70px"></th></tr></thead><tbody>`+l.map(t=>{
     const c=renk(t.durum), op=acikSet.has(t.id);
     const ozet=t.urunler.map(u=>(u.ad||u.kod||"")+" · "+miktarTR(u)).join(", ")||"—";
-    let s=`<tr class="mr" data-id="${t.id}"><td><button type="button" class="tg" data-tg="${t.id}" aria-expanded="${op}" title="${op?"Daralt":"Genişlet"}">${op?"−":"+"}</button></td><td class="nw"><span class="dot" style="background:${c}"></span><b>${esc(t.ref)||"(referanssız)"}</b>${t.sicak==="1"?`<span class="tmp">${esc(t.sicakD)||"Sıcaklık"}</span>`:""}</td><td class="nw pn" title="${esc(t.partner)}">${esc(t.partner)}</td><td class="nw ul" title="${esc(t.ulke)}">${esc(t.ulke)}</td><td class="nw ell" title="${esc(ozet)}">${esc(ozet)}</td><td class="nw"><span class="st" style="background:${c}22;color:${c};border:1px solid ${c}66">${esc(t.durum)}</span></td></tr>`;
+    let s=`<tr class="mr${t.gizli?" gz":""}" data-id="${t.id}"><td><button type="button" class="tg" data-tg="${t.id}" aria-expanded="${op}" title="${op?"Daralt":"Genişlet"}">${op?"−":"+"}</button></td><td class="nw"><span class="dot" style="background:${c}"></span><b>${esc(t.ref)||"(referanssız)"}</b>${t.sicak==="1"?`<span class="tmp">${esc(t.sicakD)||"Sıcaklık"}</span>`:""}</td><td class="nw pn" title="${esc(t.partner)}">${esc(t.partner)}</td><td class="nw ul" title="${esc(t.ulke)}">${esc(t.ulke)}</td><td class="nw ell" title="${esc(ozet)}">${esc(ozet)}</td><td class="nw"><span class="st" style="background:${c}22;color:${c};border:1px solid ${c}66">${esc(t.durum)}</span></td><td class="nw"><button type="button" class="gzb" data-gz="${t.id}" title="${t.gizli?"Bu satırı tekrar göster":"Bu satırı listeden gizle"}">${t.gizli?"Göster":"Gizle"}</button></td></tr>`;
     if(op){
       const ur=t.urunler.map(u=>`<div>${esc(u.ad||u.kod)}${u.kod&&u.ad?` <span class="meta" style="font-weight:400">(${esc(u.kod)})</span>`:""} <span class="meta" style="font-weight:400">· ${esc(miktarTR(u))}${u.seri?" · Seri: "+esc(u.seri):""}${u.skt?" · SKT: "+ay(u.skt):""}${u.fiyat?" · "+esc(para(num(u.fiyat),u.pb||"EUR")):""}${u.sicak==="1"?" · Sıcaklık: "+(esc(u.sicakD)||"Var"):""}</span></div>`).join("");
       const dg=(t.durumlar||[]).map(e=>`<div>${tr(e.t)} · ${esc(e.d)}${e.a?` <span class="meta" style="font-weight:400">(${esc(e.a)})</span>`:""}</div>`).join("");
-      s+=`<tr class="dr"><td></td><td colspan="5"><div class="det">`+
+      s+=`<tr class="dr"><td></td><td colspan="6"><div class="det">`+
         `<div class="w"><div class="meta">Ürünler</div>${ur||"—"}</div>`+
         kvd("Başvuru",[t.basNo?"No: "+esc(t.basNo):"",t.basT?"Tarih: "+tr(t.basT):"",t.ihrT?"İhracat onayı: "+tr(t.ihrT):""].filter(Boolean).map(x=>`<div>${x}</div>`).join(""))+
         kvd("Sevkiyat",[t.kargo?"Kargo: "+esc(t.kargo):"",t.takip?"Takip no: "+esc(t.takip):"",t.gonT?"Gönderim: "+tr(t.gonT):"",t.beyanNo?"Beyanname: "+esc(t.beyanNo):""].filter(Boolean).map(x=>`<div>${x}</div>`).join(""))+
@@ -330,6 +337,7 @@ function ciz(){
     return s;
   }).join("")+`</tbody></table></div>`:`<div class="empty">Kayıt yok. "Yeni talep" ile başlayın.</div>`;
   document.querySelectorAll(".tg").forEach(b=>b.onclick=e=>{e.stopPropagation();const id=b.dataset.tg;acikSet.has(id)?acikSet.delete(id):acikSet.add(id);ciz()});
+  document.querySelectorAll("[data-gz]").forEach(b=>b.onclick=e=>{e.stopPropagation();const t=db.find(x=>x.id===b.dataset.gz);if(t){t.gizli=!t.gizli;sakla();ciz()}});
   document.querySelectorAll("[data-ed]").forEach(b=>b.onclick=()=>ac(b.dataset.ed));
   uyariGoster();
 }
@@ -833,16 +841,16 @@ $("raporTek").onclick=()=>{const t=formOku({});$("dlg").close();yazdir(tekRapor(
 $("raporListe").onclick=()=>{
   const l=filtreliListe();
   if(!l.length){alert("Rapora alınacak kayıt yok.");return}
-  yazdir(`<h2>İhracat Numune Takip Raporu</h2><div class="sub">Rapor tarihi: ${bugun()} · ${l.length} kayıt${filtreDurum?" · Durum: "+esc(filtreDurum):""}${fltSay()?" · "+esc(fltOzet()):""}</div>
+  yazdir(`<h2>İhracat Numune Takip Raporu</h2><div class="sub">Rapor tarihi: ${bugun()} · ${l.length} kayıt${fltSay()?" · "+esc(fltOzet()):""}</div>
   <table><tr><th>Ref no</th><th>Tarih</th><th>Partner / Ülke</th><th>Durum</th><th>Toplam</th><th>Başvuru no / tarih</th><th>İhracat onayı</th><th>Kargo / takip</th></tr>`+
   l.map(t=>`<tr><td>${esc(t.ref)}${t.sicak==="1"?"<br>(sıcaklık)":""}</td><td>${tr(t.tarih)}</td><td>${esc(t.partner)}<br>${esc(t.ulke)}</td><td>${esc(t.durum)}</td><td>${esc(toplamMetin(t))}</td><td>${esc(t.basNo)}<br>${tr(t.basT)}</td><td>${tr(t.ihrT)}</td><td>${esc(t.kargo)}<br>${esc(t.takip)}</td></tr>`).join("")+"</table>");
 };
 $("ara").oninput=ciz;
-function fltTemizle(){flt.ulke=flt.partner=flt.urun=flt.sicak="";fltSecenekler();ciz()}
+function fltTemizle(){flt.durum=flt.ulke=flt.partner=flt.urun=flt.sicak="";fltSecenekler();ciz()}
 $("fltAc").onclick=()=>{fltSecenekler();$("fltDlg").showModal()};
 $("fltKapat").onclick=()=>$("fltDlg").close();
 $("fltTemizle").onclick=fltTemizle;
-[["fUlke","ulke"],["fPartner","partner"],["fUrun","urun"],["fSicak","sicak"]].forEach(([id,k])=>$(id).onchange=e=>{flt[k]=e.target.value;ciz()});
+[["fDurum","durum"],["fUlke","ulke"],["fPartner","partner"],["fUrun","urun"],["fSicak","sicak"]].forEach(([id,k])=>$(id).onchange=e=>{flt[k]=e.target.value;ciz()});
 
 yukle();secenekleriDoldur();ciz();
 
