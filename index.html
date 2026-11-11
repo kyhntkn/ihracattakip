@@ -44,7 +44,7 @@ dialog::backdrop{background:rgba(0,0,0,.45)}
 .dh{gap:10px;flex-wrap:wrap}
 .db{padding:6px 18px 18px}
 .tg{width:28px;height:28px;padding:0;font-size:18px;line-height:1;font-weight:600;color:var(--acc);border-radius:6px}
-.lt td.nw{white-space:nowrap}.lt td.ell{max-width:280px;overflow:hidden;text-overflow:ellipsis}
+.lt td.nw{white-space:nowrap}.lt td.ell{max-width:280px;overflow:hidden;text-overflow:ellipsis}.lt td.pn{max-width:260px;overflow:hidden;text-overflow:ellipsis}.lt td.ul{max-width:170px;overflow:hidden;text-overflow:ellipsis}
 .lt tbody tr.dr{cursor:default;background:#f7faf9}.lt tbody tr.dr:hover{background:#f7faf9}
 .det{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:12px 20px;padding:4px 2px 6px}.det .w{grid-column:1/-1}.det .meta{font-size:12px;font-weight:600;margin-bottom:2px}
 fieldset{border:1px solid var(--line);border-radius:8px;margin:12px 0;padding:8px 12px 12px}
@@ -205,8 +205,8 @@ label input,label select,label textarea{display:block;width:100%;margin-top:3px;
       <div class="plgrid">
         <label>Belge tarihi<input type="date" id="plDate"></label>
         <label>Terms of delivery<input id="deliveryTerms" placeholder="Örn. Uppsala, Sweden"></label>
-        <label>Origin (üst bölüm)<input id="originTop" placeholder="Turkey"></label>
-        <label>Origin (alt bölüm)<input id="origin" placeholder="Turkey"></label>
+        <label>Origin (üst bölüm)<input id="originTop" placeholder="Türkiye"></label>
+        <label>Origin (alt bölüm)<input id="origin" placeholder="Türkiye"></label>
         <label>Net ağırlık (kg)<input id="netWeight" inputmode="decimal"></label>
         <label>Toplam ağırlık (kg)<input id="totalWeight" inputmode="decimal"></label>
         <label>Brüt ağırlık (kg)<input id="grossWeight" inputmode="decimal"></label>
@@ -275,7 +275,14 @@ function fltSecenekler(){
   $("fSicak").value=flt.sicak;
 }
 
-function yukle(){try{db=JSON.parse(localStorage.getItem(KEY)||"[]")}catch(e){db=[]}}
+function trDuzelt(v){
+  if(typeof v==="string")return v.replace(/\bTurkey\b/gi,"Türkiye");
+  if(Array.isArray(v))return v.map(trDuzelt);
+  if(v&&typeof v==="object"){const o={};for(const k in v)o[k]=trDuzelt(v[k]);return o}
+  return v;
+}
+function yukle(){try{db=JSON.parse(localStorage.getItem(KEY)||"[]")}catch(e){db=[]}
+  try{const once=JSON.stringify(db);db=trDuzelt(db);if(JSON.stringify(db)!==once)localStorage.setItem(KEY,JSON.stringify(db))}catch(e){}}
 function sakla(){try{localStorage.setItem(KEY,JSON.stringify(db))}catch(e){alert("Tarayıcı kaydı başarısız. Lütfen hemen yedek indirin.")}}
 const esc=s=>String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 const num=v=>parseFloat(String(v).replace(",","."))||0;
@@ -306,7 +313,7 @@ function ciz(){
   $("liste").innerHTML=l.length?`<div class="tw"><table class="lt"><thead><tr><th style="width:44px"></th><th>Ref no</th><th>Partner</th><th>Ülke</th><th>Talepler</th><th>İşlem durumu</th></tr></thead><tbody>`+l.map(t=>{
     const c=renk(t.durum), op=acikSet.has(t.id);
     const ozet=t.urunler.map(u=>(u.ad||u.kod||"")+" · "+miktarTR(u)).join(", ")||"—";
-    let s=`<tr class="mr" data-id="${t.id}"><td><button type="button" class="tg" data-tg="${t.id}" aria-expanded="${op}" title="${op?"Daralt":"Genişlet"}">${op?"−":"+"}</button></td><td class="nw"><span class="dot" style="background:${c}"></span><b>${esc(t.ref)||"(referanssız)"}</b>${t.sicak==="1"?`<span class="tmp">${esc(t.sicakD)||"Sıcaklık"}</span>`:""}</td><td class="nw">${esc(t.partner)}</td><td class="nw">${esc(t.ulke)}</td><td class="nw ell" title="${esc(ozet)}">${esc(ozet)}</td><td class="nw"><span class="st" style="background:${c}22;color:${c};border:1px solid ${c}66">${esc(t.durum)}</span></td></tr>`;
+    let s=`<tr class="mr" data-id="${t.id}"><td><button type="button" class="tg" data-tg="${t.id}" aria-expanded="${op}" title="${op?"Daralt":"Genişlet"}">${op?"−":"+"}</button></td><td class="nw"><span class="dot" style="background:${c}"></span><b>${esc(t.ref)||"(referanssız)"}</b>${t.sicak==="1"?`<span class="tmp">${esc(t.sicakD)||"Sıcaklık"}</span>`:""}</td><td class="nw pn" title="${esc(t.partner)}">${esc(t.partner)}</td><td class="nw ul" title="${esc(t.ulke)}">${esc(t.ulke)}</td><td class="nw ell" title="${esc(ozet)}">${esc(ozet)}</td><td class="nw"><span class="st" style="background:${c}22;color:${c};border:1px solid ${c}66">${esc(t.durum)}</span></td></tr>`;
     if(op){
       const ur=t.urunler.map(u=>`<div>${esc(u.ad||u.kod)}${u.kod&&u.ad?` <span class="meta" style="font-weight:400">(${esc(u.kod)})</span>`:""} <span class="meta" style="font-weight:400">· ${esc(miktarTR(u))}${u.seri?" · Seri: "+esc(u.seri):""}${u.skt?" · SKT: "+ay(u.skt):""}${u.fiyat?" · "+esc(para(num(u.fiyat),u.pb||"EUR")):""}${u.sicak==="1"?" · Sıcaklık: "+(esc(u.sicakD)||"Var"):""}</span></div>`).join("");
       const dg=(t.durumlar||[]).map(e=>`<div>${tr(e.t)} · ${esc(e.d)}${e.a?` <span class="meta" style="font-weight:400">(${esc(e.a)})</span>`:""}</div>`).join("");
@@ -370,7 +377,7 @@ function hesapla(){
 
 const alanlar=["ref","tarih","durum","gSirket","gKisi","gAdres","gAdres2","gPosta","gSehir","gUlke","gTel","gMail","partner","ulke","kisi","tel","mail","adres","adres2","posta","sehir","basNo","basT","ihrT","kargo","takip","gonT","beyanNo","plDate","deliveryTerms","originTop","origin","netWeight","totalWeight","grossWeight","boxSize","remarks","not"];
 const ABKEY="ihracat_adres_defteri_v1";
-function adresDefteriOku(){try{return JSON.parse(localStorage.getItem(ABKEY)||'{"gondericiler":[],"alicilar":[]}')}catch(e){return {gondericiler:[],alicilar:[]}}}
+function adresDefteriOku(){try{return trDuzelt(JSON.parse(localStorage.getItem(ABKEY)||'{"gondericiler":[],"alicilar":[]}'))}catch(e){return {gondericiler:[],alicilar:[]}}}
 function adresDefteriSakla(a){localStorage.setItem(ABKEY,JSON.stringify(a))}
 function secenekleriDoldur(){
   const a=adresDefteriOku();
@@ -469,7 +476,7 @@ function ac(id){
   dgKayit=(t.durumlar||[]).map(e=>({...e}));dgSirala();dgCiz();$("dgDurum").value="";$("dgAcik").value="";$("dgTarih").value=bugunIso();
   alanlar.forEach(a=>$(a).value=t[a]??"");
   if(!$("plDate").value)$("plDate").value=new Date().toISOString().slice(0,10);
-  if(!aktif){$("originTop").value="Turkey";$("origin").value="Turkey";$("remarks").value="Drug License Applications";}
+  if(!aktif){$("originTop").value="Türkiye";$("origin").value="Türkiye";$("remarks").value="Drug License Applications";}
   $("masraflar").innerHTML="";(t.masraf||[]).forEach(masrafSatir);masrafHesapla();
   $("urunler").innerHTML="";(t.urunler.length?t.urunler:[{}]).map(u=>(u.sicak===undefined&&t.sicak==="1")?{...u,sicak:"1",sicakD:t.sicakD}:u).forEach(urunSatir);
   $("dbaslik").textContent=aktif?"Talep: "+(t.ref||""):"Yeni talep";
@@ -567,8 +574,8 @@ function yedekIsle(metin){
   }catch(x){alert("Geçersiz yedek dosyası: "+x.message);return}
   if(!confirm(kayitlar.length+" kayıt yüklenecek. Mevcut kayıtlar bu yedekle DEĞİŞTİRİLECEK. Devam edilsin mi?"))return;
   try{
-    db=kayitlar;sakla();
-    if(!Array.isArray(j)&&j.adresDefteri){adresDefteriSakla(j.adresDefteri);secenekleriDoldur()}
+    db=trDuzelt(kayitlar);sakla();
+    if(!Array.isArray(j)&&j.adresDefteri){adresDefteriSakla(trDuzelt(j.adresDefteri));secenekleriDoldur()}
     ciz();
   }catch(x){alert("Yedek yüklenirken hata oluştu: "+x.message)}
 }
@@ -843,7 +850,7 @@ yukle();secenekleriDoldur();ciz();
   const body=document.querySelector("#dlg .db");
   const fs=[...body.querySelectorAll(":scope > fieldset, :scope > #docAlanlari > fieldset")];
   const bul=ad=>fs.find(f=>f.querySelector(":scope > legend").textContent.trim()===ad);
-  const SIRA=["Talep","Durum Geçmişi","Gönderici Bilgileri","Alıcı Bilgileri / Partner ve Teslimat","Notlar","Ürünler","Sevkiyat","İhracat Başvurusu","Excel Gönderim Şablonu","Packing List","Non-Toxic Letter","Proforma Invoice"];
+  const SIRA=["Talep","Durum Geçmişi","Gönderici Bilgileri","Alıcı Bilgileri / Partner ve Teslimat","Notlar","Ürünler","Sevkiyat","İhracat Başvurusu","Packing List","Excel Gönderim Şablonu","Non-Toxic Letter","Proforma Invoice"];
   const holder=document.getElementById("docAlanlari");
   SIRA.forEach(ad=>{const f=bul(ad);if(f)body.insertBefore(f,holder)});
   holder.remove();
