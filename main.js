@@ -72,6 +72,16 @@ ipcMain.handle('yedek:ac', async (e) => {
   }
 });
 
+// alert()/confirm() kapandıktan sonra pencere klavye odağını kaybediyor (Windows/Electron hatası);
+// pencereyi yeniden odaklayarak giriş alanlarının tekrar çalışmasını sağlar.
+ipcMain.on('pencere:odakla', (e) => {
+  const win = BrowserWindow.fromWebContents(e.sender);
+  if (!win || win.isDestroyed()) return;
+  win.blur();
+  win.focus();
+  e.sender.focus();
+});
+
 app.whenReady().then(() => {
   createWindow();
   app.on('activate', () => {
