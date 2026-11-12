@@ -18,7 +18,7 @@ button.d{color:var(--warn)}
 main{max-width:1100px;margin:0 auto;padding:16px 20px 60px}
 .bar{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px}
 .bar input,.bar select{padding:8px 10px;border:1px solid var(--line);border-radius:6px;background:var(--card)}
-.bar input{flex:1;min-width:180px}
+.bar input{flex:0 1 380px;min-width:180px}
 .chips{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px}
 .chip{padding:4px 10px;border-radius:99px;background:var(--acc2);color:var(--acc);font-size:13px;cursor:pointer;border:0}
 .chip.on{background:var(--acc);color:#fff}.chip .dot{margin-right:5px}
@@ -34,9 +34,7 @@ main{max-width:1100px;margin:0 auto;padding:16px 20px 60px}
 .lt td{padding:10px 12px;border-bottom:1px solid var(--line);vertical-align:top}
 .lt tbody tr{cursor:default}.lt tbody tr:hover{background:var(--acc2)}.lt tbody tr:last-child td{border-bottom:0}
 .lt .r{text-align:right;white-space:nowrap}
-.gzb{padding:2px 8px;font-size:11px;border-radius:6px;border:1px solid var(--line);background:var(--card);color:var(--mute);cursor:pointer}.gzb:hover{background:var(--acc2);color:var(--acc)}
 .lt tr.gz td{opacity:.55}
-.lt tr.gz td:last-child{opacity:1}
 #liste .lt td{font-size:13px}#liste .lt th{font-size:11px}#liste .lt .st{font-size:11px}#liste .lt .tmp{font-size:10px}#liste .lt .meta{font-size:11px}#liste .lt .det .meta{font-size:10px}
 .dot{display:inline-block;width:12px;height:12px;border-radius:50%;margin-right:8px;vertical-align:-1px}
 .dot.s{width:9px;height:9px;vertical-align:0}
@@ -106,9 +104,9 @@ label input,label select,label textarea{display:block;width:100%;margin-top:3px;
   <div class="bar">
     <input id="ara" placeholder="Ara: referans no, partner, ülke, başvuru no…">
     <button type="button" id="fltAc">Filtre</button>
+    <button type="button" id="gizliBtn"></button>
   </div>
   <div class="meta" id="fltOzet" style="margin:-6px 0 12px"></div>
-  <div class="meta" id="gizliBilgi" style="margin:-6px 0 12px"></div>
   <div id="liste"></div>
 </main>
 
@@ -315,23 +313,23 @@ function ciz(){
   $("fltOzet").innerHTML=fltSay()?esc(fltOzet())+' · <a href="#" id="fltX">Filtreyi temizle</a>':"";
   if($("fltX"))$("fltX").onclick=e=>{e.preventDefault();fltTemizle()};
   const gs=db.filter(t=>t.gizli).length;
-  $("gizliBilgi").innerHTML=gs?`${gs} satır gizli · <a href="#" id="gizliTg">${gizliGoster?"Gizlenenleri sakla":"Gizlenenleri göster"}</a>`:"";
-  if($("gizliTg"))$("gizliTg").onclick=e=>{e.preventDefault();gizliGoster=!gizliGoster;ciz()};
+  $("gizliBtn").textContent=gizliGoster?"Gizlenenleri sakla":"Gizlenenler ("+gs+")";
+  $("gizliBtn").classList.toggle("p",gizliGoster);
   const kvd=(b,i)=>`<div><div class="meta">${b}</div>${i||"—"}</div>`;
-  $("liste").innerHTML=l.length?`<div class="tw"><table class="lt"><thead><tr><th style="width:44px"></th><th>Ref no</th><th>Partner</th><th>Ülke</th><th>Talepler</th><th>İşlem durumu</th><th style="width:70px"></th></tr></thead><tbody>`+l.map(t=>{
+  $("liste").innerHTML=l.length?`<div class="tw"><table class="lt"><thead><tr><th style="width:44px"></th><th>Ref no</th><th>Partner</th><th>Ülke</th><th>Talepler</th><th>İşlem durumu</th></tr></thead><tbody>`+l.map(t=>{
     const c=renk(t.durum), op=acikSet.has(t.id);
     const ozet=t.urunler.map(u=>(u.ad||u.kod||"")+" · "+miktarTR(u)).join(", ")||"—";
-    let s=`<tr class="mr${t.gizli?" gz":""}" data-id="${t.id}"><td><button type="button" class="tg" data-tg="${t.id}" aria-expanded="${op}" title="${op?"Daralt":"Genişlet"}">${op?"−":"+"}</button></td><td class="nw"><span class="dot" style="background:${c}"></span><b>${esc(t.ref)||"(referanssız)"}</b>${t.sicak==="1"?`<span class="tmp">${esc(t.sicakD)||"Sıcaklık"}</span>`:""}</td><td class="nw pn" title="${esc(t.partner)}">${esc(t.partner)}</td><td class="nw ul" title="${esc(t.ulke)}">${esc(t.ulke)}</td><td class="nw ell" title="${esc(ozet)}">${esc(ozet)}</td><td class="nw"><span class="st" style="background:${c}22;color:${c};border:1px solid ${c}66">${esc(t.durum)}</span></td><td class="nw"><button type="button" class="gzb" data-gz="${t.id}" title="${t.gizli?"Bu satırı tekrar göster":"Bu satırı listeden gizle"}">${t.gizli?"Göster":"Gizle"}</button></td></tr>`;
+    let s=`<tr class="mr${t.gizli?" gz":""}" data-id="${t.id}"><td><button type="button" class="tg" data-tg="${t.id}" aria-expanded="${op}" title="${op?"Daralt":"Genişlet"}">${op?"−":"+"}</button></td><td class="nw"><span class="dot" style="background:${c}"></span><b>${esc(t.ref)||"(referanssız)"}</b>${t.sicak==="1"?`<span class="tmp">${esc(t.sicakD)||"Sıcaklık"}</span>`:""}</td><td class="nw pn" title="${esc(t.partner)}">${esc(t.partner)}</td><td class="nw ul" title="${esc(t.ulke)}">${esc(t.ulke)}</td><td class="nw ell" title="${esc(ozet)}">${esc(ozet)}</td><td class="nw"><span class="st" style="background:${c}22;color:${c};border:1px solid ${c}66">${esc(t.durum)}</span></td></tr>`;
     if(op){
       const ur=t.urunler.map(u=>`<div>${esc(u.ad||u.kod)}${u.kod&&u.ad?` <span class="meta" style="font-weight:400">(${esc(u.kod)})</span>`:""} <span class="meta" style="font-weight:400">· ${esc(miktarTR(u))}${u.seri?" · Seri: "+esc(u.seri):""}${u.skt?" · SKT: "+ay(u.skt):""}${u.fiyat?" · "+esc(para(num(u.fiyat),u.pb||"EUR")):""}${u.sicak==="1"?" · Sıcaklık: "+(esc(u.sicakD)||"Var"):""}</span></div>`).join("");
       const dg=(t.durumlar||[]).map(e=>`<div>${tr(e.t)} · ${esc(e.d)}${e.a?` <span class="meta" style="font-weight:400">(${esc(e.a)})</span>`:""}</div>`).join("");
-      s+=`<tr class="dr"><td></td><td colspan="6"><div class="det">`+
+      s+=`<tr class="dr"><td></td><td colspan="5"><div class="det">`+
         `<div class="w"><div class="meta">Ürünler</div>${ur||"—"}</div>`+
         kvd("Başvuru",[t.basNo?"No: "+esc(t.basNo):"",t.basT?"Tarih: "+tr(t.basT):"",t.ihrT?"İhracat onayı: "+tr(t.ihrT):""].filter(Boolean).map(x=>`<div>${x}</div>`).join(""))+
         kvd("Sevkiyat",[t.kargo?"Kargo: "+esc(t.kargo):"",t.takip?"Takip no: "+esc(t.takip):"",t.gonT?"Gönderim: "+tr(t.gonT):"",t.beyanNo?"Beyanname: "+esc(t.beyanNo):""].filter(Boolean).map(x=>`<div>${x}</div>`).join(""))+
         kvd("Durum geçmişi",dg)+
         (t.not?`<div class="w"><div class="meta">Notlar</div><div style="white-space:pre-wrap">${esc(t.not)}</div></div>`:"")+
-        `<div class="w"><button type="button" class="p" data-ed="${t.id}">Düzenle</button></div>`+
+        `<div class="w"><button type="button" class="p" data-ed="${t.id}">Düzenle</button> <button type="button" class="gzb" data-gz="${t.id}" title="${t.gizli?"Bu satırı tekrar göster":"Bu satırı listeden gizle"}">${t.gizli?"Göster":"Gizle"}</button></div>`+
         `</div></td></tr>`;
     }
     return s;
@@ -847,6 +845,7 @@ $("raporListe").onclick=()=>{
 };
 $("ara").oninput=ciz;
 function fltTemizle(){flt.durum=flt.ulke=flt.partner=flt.urun=flt.sicak="";fltSecenekler();ciz()}
+$("gizliBtn").onclick=()=>{gizliGoster=!gizliGoster;ciz()};
 $("fltAc").onclick=()=>{fltSecenekler();$("fltDlg").showModal()};
 $("fltKapat").onclick=()=>$("fltDlg").close();
 $("fltTemizle").onclick=fltTemizle;
