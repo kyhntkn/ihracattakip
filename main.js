@@ -72,11 +72,8 @@ ipcMain.handle('yedek:ac', async (e) => {
   }
 });
 
-// ---- Ek dokümanlar: seçilen dosyaları kullanıcının belirlediği klasöre kopyalar ----
+// ---- Ek dokümanlar: seçilen dosyalar, o talep için belirlenen klasöre kopyalanır ----
 const TEHLIKELI_UZANTI = /\.(exe|bat|cmd|com|msi|scr|vbs|vbe|js|jse|wsf|ps1|lnk|reg|hta|jar)$/i;
-function guvenliAd(s) {
-  return String(s || '').replace(/[<>:"/\\|?*\u0000-\u001f]/g, '-').replace(/[. ]+$/, '').trim() || 'Diger';
-}
 function benzersizYol(dir, ad) {
   let yol = path.join(dir, ad);
   if (!fs.existsSync(yol)) return yol;
@@ -87,21 +84,19 @@ function benzersizYol(dir, ad) {
   }
   return path.join(dir, `${name}-${Date.now()}${ext}`);
 }
-function ekKopyala(klasor, alt, kaynak) {
-  const dir = path.join(klasor, guvenliAd(alt));
-  fs.mkdirSync(dir, { recursive: true });
+function ekKopyala(klasor, kaynak) {
   // dosya zaten bu klasördeyse yeniden kopyalama
-  if (path.resolve(path.dirname(kaynak)) === path.resolve(dir)) return { ad: path.basename(kaynak), yol: kaynak };
-  const hedef = benzersizYol(dir, path.basename(kaynak));
+  if (path.resolve(path.dirname(kaynak)) === path.resolve(klasor)) return { ad: path.basename(kaynak), yol: kaynak };
+  const hedef = benzersizYol(klasor, path.basename(kaynak));
   fs.copyFileSync(kaynak, hedef);
   return { ad: path.basename(hedef), yol: hedef };
 }
-ipcMain.handle('ek:klasorSec', async (e) => {
+ipcMain.handle('ek:klasorSec', async (e, baslangic) => {
   try {
     const win = BrowserWindow.fromWebContents(e.sender);
     const r = await dialog.showOpenDialog(win, {
-      title: 'Eklerin kaydedileceği klasörü seçin',
-      defaultPath: app.getPath('documents'),
+      title: 'Bu talebin eklerinin kaydedileceği klasörü seçin',
+      defaultPath: baslangic && fs.existsSync(baslangic) ? baslangic : app.getPath('documents'),
       properties: ['openDirectory', 'createDirectory']
     });
     if (r.canceled || !r.filePaths.length) return { iptal: true };
@@ -110,9 +105,9 @@ ipcMain.handle('ek:klasorSec', async (e) => {
     return { ok: false, hata: String(err.message || err) };
   }
 });
-ipcMain.handle('ek:ekle', async (e, klasor, alt) => {
+ipcMain.handle('ek:ekle', async (e, klasor) => {
   try {
-    if (!klasor || !fs.existsSync(klasor)) return { ok: false, hata: 'Ek klasörü bulunamadı. Lütfen "Ek klasörünü seç" ile yeniden seçin.' };
+    if (!klasor || !fs.existsSync(klasor)) return { ok: false, hata: 'Bu talebin ek klasörü bulunamadı. Lütfen klasörü yeniden seçin.' };
     const win = BrowserWindow.fromWebContents(e.sender);
     const r = await dialog.showOpenDialog(win, {
       title: 'Eklenecek dosyaları seçin',
@@ -120,7 +115,16 @@ ipcMain.handle('ek:ekle', async (e, klasor, alt) => {
       properties: ['openFile', 'multiSelections']
     });
     if (r.canceled || !r.filePaths.length) return { iptal: true };
-    return { ok: true, dosyalar: r.filePaths.map((k) => ekKopyala(klasor, alt, k)) };
+    return { ok: true, dosyalar: r.filePaths.map((k) => ekKopyala(klasor, k)) };
+  } catch (err) {
+    return { ok: false, hata: String(err.message || err) };
+  }
+});
+ipcMain.handle('ek:klasorAc', async (e, klasor) => {
+  try {
+    if (!klasor || !fs.existsSync(klasor)) return { ok: false, hata: 'Klasör bulunamadı:\n' + klasor };
+    const hata = await shell.openPath(klasor);
+    return hata ? { ok: false, hata } : { ok: true };
   } catch (err) {
     return { ok: false, hata: String(err.message || err) };
   }

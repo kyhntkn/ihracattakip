@@ -228,7 +228,7 @@ label input,label select,label textarea{display:block;width:100%;margin-top:3px;
       <div class="meta" style="margin-top:6px">Şablondaki işaretli alanlar bu talepten doldurulur (turuncu renk çıktıda kaldırılır): kargo firması, alıcı adı ve adresi, ürün satırları (kod, ad, miktar, seri no, birim fiyat, para birimi, sıcaklık, 3006 depo, CoA), net/brüt ağırlık ve kutu ölçüsü.</div>
     </fieldset>
     <fieldset id="fsEkler"><legend>Ek Dokümanlar</legend>
-      <div class="plactions" style="margin-top:0"><button type="button" class="p" id="ekEkle">📎 Ek ekle…</button><button type="button" id="ekKlasor">Ek klasörünü seç…</button></div>
+      <div class="plactions" style="margin-top:0"><button type="button" class="p" id="ekEkle">📎 Ek ekle…</button><button type="button" id="ekKlasor">Bu talebin ek klasörünü seç…</button><button type="button" id="ekKlasorAc">Klasörü aç</button></div>
       <div class="meta" id="ekKlasorYol" style="margin:6px 0"></div>
       <div id="ekListe"></div>
     </fieldset>
@@ -490,7 +490,7 @@ function ac(id){
   const t=aktif||{durum:DURUMLAR[0],sicak:"0",tarih:new Date().toISOString().slice(0,10),urunler:[{}]};
   $("durum").innerHTML=DURUMLAR.map(d=>`<option>${d}</option>`).join("");
   $("durumListe").innerHTML=DURUMLAR.map(d=>`<option value="${d}">`).join("");
-  ekKayit=(t.ekler||[]).map(e=>({...e}));ekCiz();
+  ekKayit=(t.ekler||[]).map(e=>({...e}));ekKlasorTalep=t.ekKlasor||(ekKayit.length?ekUstKlasor(ekKayit[0].yol):"");ekCiz();
   dgKayit=(t.durumlar||[]).map(e=>({...e}));dgSirala();dgCiz();$("dgDurum").value="";$("dgAcik").value="";$("dgTarih").value=bugunIso();
   alanlar.forEach(a=>$(a).value=t[a]??"");
   Object.keys(PF_DEF).forEach(k=>{if(t[k]===undefined)$(k).value=PF_DEF[k]});
@@ -507,7 +507,7 @@ function formOku(t){
   alanlar.forEach(a=>t[a]=$(a).value.trim());
   t.masraf=okuMasraf();
   t.durumlar=dgKayit.map(e=>({...e}));
-  t.ekler=ekKayit.map(e=>({...e}));
+  t.ekler=ekKayit.map(e=>({...e}));t.ekKlasor=ekKlasorTalep;
   t.urunler=okuUrun().filter(u=>u.kod||u.ad||u.kutu||u.seri||u.plWeight);
   const sicU=t.urunler.filter(u=>u.sicak==="1");
   t.sicak=sicU.length?"1":"0";
@@ -883,37 +883,38 @@ $("fltTemizle").onclick=fltTemizle;
 
 yukle();secenekleriDoldur();ciz();
 
-/* ---- Ek dokümanlar ---- */
-let ekKayit=[];
-const EK_KEY="ihracat_ek_klasor";
-const ekKlasorOku=()=>{try{return localStorage.getItem(EK_KEY)||""}catch(e){return ""}};
+/* ---- Ek dokümanlar (her talebin kendi klasörü vardır) ---- */
+let ekKayit=[],ekKlasorTalep="";
+const EK_SON="ihracat_ek_son_klasor";
+const ekSonOku=()=>{try{return localStorage.getItem(EK_SON)||""}catch(e){return ""}};
 const ekVar=()=>!!(window.masaustu&&window.masaustu.ekEkle);
+const ekUstKlasor=y=>{const i=Math.max(String(y).lastIndexOf("\\"),String(y).lastIndexOf("/"));return i>0?String(y).slice(0,i):""};
 async function ekAc(yol){
   if(!ekVar()){alert("Ekler yalnızca masaüstü uygulamasında açılabilir.");return}
   try{const r=await window.masaustu.ekAc(yol);if(!r.ok)alert(r.hata||"Dosya açılamadı.")}catch(e){alert("Dosya açılamadı: "+(e.message||e))}
 }
 async function ekKlasorSec(){
-  try{const r=await window.masaustu.ekKlasorSec();if(r.iptal)return "";if(!r.ok){alert(r.hata||"Klasör seçilemedi.");return ""}
-    try{localStorage.setItem(EK_KEY,r.yol)}catch(e){}ekCiz();return r.yol}
+  try{const r=await window.masaustu.ekKlasorSec(ekKlasorTalep||ekSonOku());if(r.iptal)return "";if(!r.ok){alert(r.hata||"Klasör seçilemedi.");return ""}
+    ekKlasorTalep=r.yol;try{localStorage.setItem(EK_SON,r.yol)}catch(e){}ekCiz();return r.yol}
   catch(e){alert("Klasör seçilemedi: "+(e.message||e));return ""}
 }
 function ekCiz(){
   const md=ekVar();
-  $("ekEkle").disabled=!md;$("ekKlasor").disabled=!md;
-  $("ekKlasorYol").textContent=md?(ekKlasorOku()?"Kayıt klasörü: "+ekKlasorOku():"Kayıt klasörü henüz seçilmedi (ilk ek eklenirken sorulur)."):"Ek dokümanlar yalnızca masaüstü uygulamasında kullanılabilir.";
+  $("ekEkle").disabled=!md;$("ekKlasor").disabled=!md;$("ekKlasorAc").disabled=!md||!ekKlasorTalep;
+  $("ekKlasorYol").textContent=md?(ekKlasorTalep?"Bu talebin ek klasörü: "+ekKlasorTalep:"Bu talep için ek klasörü henüz seçilmedi (ilk ek eklenirken sorulur)."):"Ek dokümanlar yalnızca masaüstü uygulamasında kullanılabilir.";
   $("ekListe").innerHTML=ekKayit.length?ekKayit.map((e,i)=>`<div class="ekrow"><span>📎</span><a href="#" data-eko="${i}" title="${esc(e.yol)}">${esc(e.ad)}</a><button type="button" class="d" data-eks="${i}">Sil ×</button></div>`).join(""):'<div class="meta">Henüz ek eklenmedi.</div>';
   $("ekListe").querySelectorAll("[data-eko]").forEach(a=>a.onclick=e=>{e.preventDefault();const k=ekKayit[+a.dataset.eko];if(k)ekAc(k.yol)});
   $("ekListe").querySelectorAll("[data-eks]").forEach(b=>b.onclick=()=>{const k=ekKayit[+b.dataset.eks];
     if(k&&confirm("“"+k.ad+"” ekler listesinden kaldırılsın mı?\n(Dosya klasörde kalır, bilgisayardan silinmez.)")){ekKayit.splice(+b.dataset.eks,1);ekCiz()}});
 }
 $("ekKlasor").onclick=()=>{if(ekVar())ekKlasorSec()};
+$("ekKlasorAc").onclick=async()=>{if(!ekVar()||!ekKlasorTalep)return;try{const r=await window.masaustu.ekKlasorAc(ekKlasorTalep);if(!r.ok)alert(r.hata||"Klasör açılamadı.")}catch(e){alert("Klasör açılamadı: "+(e.message||e))}};
 $("ekEkle").onclick=async()=>{
   if(!ekVar())return;
-  let kl=ekKlasorOku();
+  let kl=ekKlasorTalep;
   if(!kl){kl=await ekKlasorSec();if(!kl)return}
-  const alt=($("ref").value||"").trim()||"Diger";
   try{
-    const r=await window.masaustu.ekEkle(kl,alt);
+    const r=await window.masaustu.ekEkle(kl);
     if(r.iptal)return;
     if(!r.ok){alert("Ek eklenemedi: "+(r.hata||""));return}
     r.dosyalar.forEach(d=>ekKayit.push({ad:d.ad,yol:d.yol,t:bugunIso()}));
