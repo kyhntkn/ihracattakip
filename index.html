@@ -35,6 +35,7 @@ main{max-width:1100px;margin:0 auto;padding:16px 20px 60px}
 .lt tbody tr{cursor:default}.lt tbody tr:hover{background:var(--acc2)}.lt tbody tr:last-child td{border-bottom:0}
 .lt .r{text-align:right;white-space:nowrap}
 .lt tr.gz td{opacity:.55}
+.ekrow{display:flex;align-items:center;gap:8px;padding:3px 0}.ekrow a{color:var(--acc);cursor:pointer;word-break:break-all}
 .logorow{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:10px}.logorow [hidden]{display:none}.logoprev{max-height:34px;max-width:120px;border:1px solid var(--line);border-radius:4px;background:#fff;padding:2px}
 #liste .lt td{font-size:13px}#liste .lt th{font-size:11px}#liste .lt .st{font-size:11px}#liste .lt .tmp{font-size:10px}#liste .lt .meta{font-size:11px}#liste .lt .det .meta{font-size:10px}
 .dot{display:inline-block;width:12px;height:12px;border-radius:50%;margin-right:8px;vertical-align:-1px}
@@ -226,6 +227,11 @@ label input,label select,label textarea{display:block;width:100%;margin-top:3px;
       <div class="plactions" style="margin-top:0"><button type="button" class="p" id="excelOlustur">Excel oluştur (.xlsx)</button></div>
       <div class="meta" style="margin-top:6px">Şablondaki işaretli alanlar bu talepten doldurulur (turuncu renk çıktıda kaldırılır): kargo firması, alıcı adı ve adresi, ürün satırları (kod, ad, miktar, seri no, birim fiyat, para birimi, sıcaklık, 3006 depo, CoA), net/brüt ağırlık ve kutu ölçüsü.</div>
     </fieldset>
+    <fieldset id="fsEkler"><legend>Ek Dokümanlar</legend>
+      <div class="plactions" style="margin-top:0"><button type="button" class="p" id="ekEkle">📎 Ek ekle…</button><button type="button" id="ekKlasor">Ek klasörünü seç…</button></div>
+      <div class="meta" id="ekKlasorYol" style="margin:6px 0"></div>
+      <div id="ekListe"></div>
+    </fieldset>
     <fieldset id="fsNotlar"><legend>Notlar</legend><label>Notlar<textarea id="not" rows="3"></textarea></label></fieldset>
   </div>
 </dialog>
@@ -320,7 +326,7 @@ function ciz(){
   $("liste").innerHTML=l.length?`<div class="tw"><table class="lt"><thead><tr><th style="width:44px"></th><th>Ref no</th><th>Partner</th><th>Ülke</th><th>Talepler</th><th>İşlem durumu</th></tr></thead><tbody>`+l.map(t=>{
     const c=renk(t.durum), op=acikSet.has(t.id);
     const ozet=t.urunler.map(u=>(u.ad||u.kod||"")+" · "+miktarTR(u)).join(", ")||"—";
-    let s=`<tr class="mr${t.gizli?" gz":""}" data-id="${t.id}"><td><button type="button" class="tg" data-tg="${t.id}" aria-expanded="${op}" title="${op?"Daralt":"Genişlet"}">${op?"−":"+"}</button></td><td class="nw"><span class="dot" style="background:${c}"></span><b>${esc(t.ref)||"(referanssız)"}</b>${t.sicak==="1"?`<span class="tmp">${esc(t.sicakD)||"Sıcaklık"}</span>`:""}</td><td class="nw pn" title="${esc(t.partner)}">${esc(t.partner)}</td><td class="nw ul" title="${esc(t.ulke)}">${esc(t.ulke)}</td><td class="nw ell" title="${esc(ozet)}">${esc(ozet)}</td><td class="nw"><span class="st" style="background:${c}22;color:${c};border:1px solid ${c}66">${esc(t.durum)}</span></td></tr>`;
+    let s=`<tr class="mr${t.gizli?" gz":""}" data-id="${t.id}"><td><button type="button" class="tg" data-tg="${t.id}" aria-expanded="${op}" title="${op?"Daralt":"Genişlet"}">${op?"−":"+"}</button></td><td class="nw"><span class="dot" style="background:${c}"></span><b>${esc(t.ref)||"(referanssız)"}</b>${t.ekler&&t.ekler.length?` <span title="${t.ekler.length} ek doküman" style="font-size:12px">📎</span>`:""}${t.sicak==="1"?`<span class="tmp">${esc(t.sicakD)||"Sıcaklık"}</span>`:""}</td><td class="nw pn" title="${esc(t.partner)}">${esc(t.partner)}</td><td class="nw ul" title="${esc(t.ulke)}">${esc(t.ulke)}</td><td class="nw ell" title="${esc(ozet)}">${esc(ozet)}</td><td class="nw"><span class="st" style="background:${c}22;color:${c};border:1px solid ${c}66">${esc(t.durum)}</span></td></tr>`;
     if(op){
       const ur=t.urunler.map(u=>`<div>${esc(u.ad||u.kod)}${u.kod&&u.ad?` <span class="meta" style="font-weight:400">(${esc(u.kod)})</span>`:""} <span class="meta" style="font-weight:400">· ${esc(miktarTR(u))}${u.seri?" · Seri: "+esc(u.seri):""}${u.skt?" · SKT: "+ay(u.skt):""}${u.fiyat?" · "+esc(para(num(u.fiyat),u.pb||"EUR")):""}${u.sicak==="1"?" · Sıcaklık: "+(esc(u.sicakD)||"Var"):""}</span></div>`).join("");
       const dg=(t.durumlar||[]).map(e=>`<div>${tr(e.t)} · ${esc(e.d)}${e.a?` <span class="meta" style="font-weight:400">(${esc(e.a)})</span>`:""}</div>`).join("");
@@ -330,6 +336,7 @@ function ciz(){
         kvd("Sevkiyat",[t.kargo?"Kargo: "+esc(t.kargo):"",t.takip?"Takip no: "+esc(t.takip):"",t.gonT?"Gönderim: "+tr(t.gonT):"",t.beyanNo?"Beyanname: "+esc(t.beyanNo):""].filter(Boolean).map(x=>`<div>${x}</div>`).join(""))+
         kvd("Durum geçmişi",dg)+
         (t.not?`<div class="w"><div class="meta">Notlar</div><div style="white-space:pre-wrap">${esc(t.not)}</div></div>`:"")+
+        (t.ekler&&t.ekler.length?`<div class="w"><div class="meta">Ek Dokümanlar</div>${t.ekler.map(e=>`<div class="ekrow"><span>📎</span><a href="#" data-ekac="${esc(e.yol)}" title="${esc(e.yol)}">${esc(e.ad)}</a></div>`).join("")}</div>`:"")+
         `<div class="w"><button type="button" class="p" data-ed="${t.id}">Düzenle</button> <button type="button" class="gzb" data-gz="${t.id}" title="${t.gizli?"Bu satırı tekrar göster":"Bu satırı listeden gizle"}">${t.gizli?"Göster":"Gizle"}</button></div>`+
         `</div></td></tr>`;
     }
@@ -338,6 +345,7 @@ function ciz(){
   document.querySelectorAll(".tg").forEach(b=>b.onclick=e=>{e.stopPropagation();const id=b.dataset.tg;acikSet.has(id)?acikSet.delete(id):acikSet.add(id);ciz()});
   document.querySelectorAll("[data-gz]").forEach(b=>b.onclick=e=>{e.stopPropagation();const t=db.find(x=>x.id===b.dataset.gz);if(t){t.gizli=!t.gizli;sakla();ciz()}});
   document.querySelectorAll("[data-ed]").forEach(b=>b.onclick=()=>ac(b.dataset.ed));
+  document.querySelectorAll("[data-ekac]").forEach(a=>a.onclick=e=>{e.preventDefault();e.stopPropagation();ekAc(a.dataset.ekac)});
   uyariGoster();
 }
 
@@ -482,6 +490,7 @@ function ac(id){
   const t=aktif||{durum:DURUMLAR[0],sicak:"0",tarih:new Date().toISOString().slice(0,10),urunler:[{}]};
   $("durum").innerHTML=DURUMLAR.map(d=>`<option>${d}</option>`).join("");
   $("durumListe").innerHTML=DURUMLAR.map(d=>`<option value="${d}">`).join("");
+  ekKayit=(t.ekler||[]).map(e=>({...e}));ekCiz();
   dgKayit=(t.durumlar||[]).map(e=>({...e}));dgSirala();dgCiz();$("dgDurum").value="";$("dgAcik").value="";$("dgTarih").value=bugunIso();
   alanlar.forEach(a=>$(a).value=t[a]??"");
   Object.keys(PF_DEF).forEach(k=>{if(t[k]===undefined)$(k).value=PF_DEF[k]});
@@ -498,6 +507,7 @@ function formOku(t){
   alanlar.forEach(a=>t[a]=$(a).value.trim());
   t.masraf=okuMasraf();
   t.durumlar=dgKayit.map(e=>({...e}));
+  t.ekler=ekKayit.map(e=>({...e}));
   t.urunler=okuUrun().filter(u=>u.kod||u.ad||u.kutu||u.seri||u.plWeight);
   const sicU=t.urunler.filter(u=>u.sicak==="1");
   t.sicak=sicU.length?"1":"0";
@@ -873,6 +883,44 @@ $("fltTemizle").onclick=fltTemizle;
 
 yukle();secenekleriDoldur();ciz();
 
+/* ---- Ek dokümanlar ---- */
+let ekKayit=[];
+const EK_KEY="ihracat_ek_klasor";
+const ekKlasorOku=()=>{try{return localStorage.getItem(EK_KEY)||""}catch(e){return ""}};
+const ekVar=()=>!!(window.masaustu&&window.masaustu.ekEkle);
+async function ekAc(yol){
+  if(!ekVar()){alert("Ekler yalnızca masaüstü uygulamasında açılabilir.");return}
+  try{const r=await window.masaustu.ekAc(yol);if(!r.ok)alert(r.hata||"Dosya açılamadı.")}catch(e){alert("Dosya açılamadı: "+(e.message||e))}
+}
+async function ekKlasorSec(){
+  try{const r=await window.masaustu.ekKlasorSec();if(r.iptal)return "";if(!r.ok){alert(r.hata||"Klasör seçilemedi.");return ""}
+    try{localStorage.setItem(EK_KEY,r.yol)}catch(e){}ekCiz();return r.yol}
+  catch(e){alert("Klasör seçilemedi: "+(e.message||e));return ""}
+}
+function ekCiz(){
+  const md=ekVar();
+  $("ekEkle").disabled=!md;$("ekKlasor").disabled=!md;
+  $("ekKlasorYol").textContent=md?(ekKlasorOku()?"Kayıt klasörü: "+ekKlasorOku():"Kayıt klasörü henüz seçilmedi (ilk ek eklenirken sorulur)."):"Ek dokümanlar yalnızca masaüstü uygulamasında kullanılabilir.";
+  $("ekListe").innerHTML=ekKayit.length?ekKayit.map((e,i)=>`<div class="ekrow"><span>📎</span><a href="#" data-eko="${i}" title="${esc(e.yol)}">${esc(e.ad)}</a><button type="button" class="d" data-eks="${i}">Sil ×</button></div>`).join(""):'<div class="meta">Henüz ek eklenmedi.</div>';
+  $("ekListe").querySelectorAll("[data-eko]").forEach(a=>a.onclick=e=>{e.preventDefault();const k=ekKayit[+a.dataset.eko];if(k)ekAc(k.yol)});
+  $("ekListe").querySelectorAll("[data-eks]").forEach(b=>b.onclick=()=>{const k=ekKayit[+b.dataset.eks];
+    if(k&&confirm("“"+k.ad+"” ekler listesinden kaldırılsın mı?\n(Dosya klasörde kalır, bilgisayardan silinmez.)")){ekKayit.splice(+b.dataset.eks,1);ekCiz()}});
+}
+$("ekKlasor").onclick=()=>{if(ekVar())ekKlasorSec()};
+$("ekEkle").onclick=async()=>{
+  if(!ekVar())return;
+  let kl=ekKlasorOku();
+  if(!kl){kl=await ekKlasorSec();if(!kl)return}
+  const alt=($("ref").value||"").trim()||"Diger";
+  try{
+    const r=await window.masaustu.ekEkle(kl,alt);
+    if(r.iptal)return;
+    if(!r.ok){alert("Ek eklenemedi: "+(r.hata||""));return}
+    r.dosyalar.forEach(d=>ekKayit.push({ad:d.ad,yol:d.yol,t:bugunIso()}));
+    ekCiz();
+  }catch(e){alert("Ek eklenemedi: "+(e.message||e))}
+};
+
 /* ---- Word belgeleri: logo (sağ üst köşe) ---- */
 const LOGO={pl:{ad:"Packing List",w:4.5,h:1.8,y:0.5},nt:{ad:"Non-Toxic Letter",w:4.5,h:1.8,y:0.5},pf:{ad:"Proforma Invoice",w:4.2,h:1.7,y:0.3}};
 const logoAnahtar=k=>"ihracat_logo_"+k;
@@ -963,7 +1011,7 @@ function logoSatiri(k){
   const body=document.querySelector("#dlg .db");
   const fs=[...body.querySelectorAll(":scope > fieldset, :scope > #docAlanlari > fieldset")];
   const bul=ad=>fs.find(f=>f.querySelector(":scope > legend").textContent.trim()===ad);
-  const SIRA=["Talep","Durum Geçmişi","Gönderici Bilgileri","Alıcı Bilgileri / Partner ve Teslimat","Notlar","Ürünler","Sevkiyat","İhracat Başvurusu","Packing List","Excel Gönderim Şablonu","Non-Toxic Letter","Proforma Invoice"];
+  const SIRA=["Talep","Ek Dokümanlar","Durum Geçmişi","Gönderici Bilgileri","Alıcı Bilgileri / Partner ve Teslimat","Notlar","Ürünler","Sevkiyat","İhracat Başvurusu","Packing List","Excel Gönderim Şablonu","Non-Toxic Letter","Proforma Invoice"];
   const holder=document.getElementById("docAlanlari");
   SIRA.forEach(ad=>{const f=bul(ad);if(f)body.insertBefore(f,holder)});
   holder.remove();

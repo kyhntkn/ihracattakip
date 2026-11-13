@@ -72,6 +72,70 @@ ipcMain.handle('yedek:ac', async (e) => {
   }
 });
 
+// ---- Ek dokümanlar: seçilen dosyaları kullanıcının belirlediği klasöre kopyalar ----
+const TEHLIKELI_UZANTI = /\.(exe|bat|cmd|com|msi|scr|vbs|vbe|js|jse|wsf|ps1|lnk|reg|hta|jar)$/i;
+function guvenliAd(s) {
+  return String(s || '').replace(/[<>:"/\\|?*\u0000-\u001f]/g, '-').replace(/[. ]+$/, '').trim() || 'Diger';
+}
+function benzersizYol(dir, ad) {
+  let yol = path.join(dir, ad);
+  if (!fs.existsSync(yol)) return yol;
+  const { name, ext } = path.parse(ad);
+  for (let i = 2; i < 1000; i++) {
+    yol = path.join(dir, `${name} (${i})${ext}`);
+    if (!fs.existsSync(yol)) return yol;
+  }
+  return path.join(dir, `${name}-${Date.now()}${ext}`);
+}
+function ekKopyala(klasor, alt, kaynak) {
+  const dir = path.join(klasor, guvenliAd(alt));
+  fs.mkdirSync(dir, { recursive: true });
+  // dosya zaten bu klasördeyse yeniden kopyalama
+  if (path.resolve(path.dirname(kaynak)) === path.resolve(dir)) return { ad: path.basename(kaynak), yol: kaynak };
+  const hedef = benzersizYol(dir, path.basename(kaynak));
+  fs.copyFileSync(kaynak, hedef);
+  return { ad: path.basename(hedef), yol: hedef };
+}
+ipcMain.handle('ek:klasorSec', async (e) => {
+  try {
+    const win = BrowserWindow.fromWebContents(e.sender);
+    const r = await dialog.showOpenDialog(win, {
+      title: 'Eklerin kaydedileceği klasörü seçin',
+      defaultPath: app.getPath('documents'),
+      properties: ['openDirectory', 'createDirectory']
+    });
+    if (r.canceled || !r.filePaths.length) return { iptal: true };
+    return { ok: true, yol: r.filePaths[0] };
+  } catch (err) {
+    return { ok: false, hata: String(err.message || err) };
+  }
+});
+ipcMain.handle('ek:ekle', async (e, klasor, alt) => {
+  try {
+    if (!klasor || !fs.existsSync(klasor)) return { ok: false, hata: 'Ek klasörü bulunamadı. Lütfen "Ek klasörünü seç" ile yeniden seçin.' };
+    const win = BrowserWindow.fromWebContents(e.sender);
+    const r = await dialog.showOpenDialog(win, {
+      title: 'Eklenecek dosyaları seçin',
+      defaultPath: app.getPath('documents'),
+      properties: ['openFile', 'multiSelections']
+    });
+    if (r.canceled || !r.filePaths.length) return { iptal: true };
+    return { ok: true, dosyalar: r.filePaths.map((k) => ekKopyala(klasor, alt, k)) };
+  } catch (err) {
+    return { ok: false, hata: String(err.message || err) };
+  }
+});
+ipcMain.handle('ek:ac', async (e, yol) => {
+  try {
+    if (!yol || !fs.existsSync(yol)) return { ok: false, hata: 'Dosya bulunamadı (taşınmış veya silinmiş olabilir):\n' + yol };
+    if (TEHLIKELI_UZANTI.test(yol)) return { ok: false, hata: 'Güvenlik nedeniyle bu dosya türü programdan açılamaz.' };
+    const hata = await shell.openPath(yol);
+    return hata ? { ok: false, hata } : { ok: true };
+  } catch (err) {
+    return { ok: false, hata: String(err.message || err) };
+  }
+});
+
 // alert()/confirm() kapandıktan sonra pencere klavye odağını kaybediyor (Windows/Electron hatası);
 // pencereyi yeniden odaklayarak giriş alanlarının tekrar çalışmasını sağlar.
 ipcMain.on('pencere:odakla', (e) => {
